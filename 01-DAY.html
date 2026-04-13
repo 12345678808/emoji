@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Emoji Memory Match</title>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Fira+Code:wght@500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #1a1a2e;
+    --surface: #16213e;
+    --card-back: #0f3460;
+    --card-front: #ffffff;
+    --accent: #e94560;
+    --accent2: #f5a623;
+    --green: #4ecca3;
+    --border: #1e3a5f;
+    --text: #eaeaea;
+    --muted: #7a8ba6;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    min-height: 100vh;
+    background: var(--bg);
+    font-family: 'Nunito', sans-serif;
+    color: var(--text);
+    overflow-x: hidden;
+  }
+
+  /* BG STARS */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      radial-gradient(1.5px 1.5px at 10% 20%, rgba(255,255,255,0.15) 0%, transparent 100%),
+      radial-gradient(1px 1px at 30% 60%, rgba(255,255,255,0.1) 0%, transparent 100%),
+      radial-gradient(1.5px 1.5px at 70% 10%, rgba(255,255,255,0.12) 0%, transparent 100%),
+      radial-gradient(1px 1px at 85% 75%, rgba(255,255,255,0.1) 0%, transparent 100%),
+      radial-gradient(1.5px 1.5px at 50% 90%, rgba(255,255,255,0.1) 0%, transparent 100%),
+      radial-gradient(800px 600px at 20% 30%, rgba(233,69,96,0.06) 0%, transparent 70%),
+      radial-gradient(600px 500px at 80% 70%, rgba(78,204,163,0.06) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .game-wrapper {
+    position: relative;
+    z-index: 1;
+    max-width: 680px;
+    margin: 0 auto;
+    padding: 30px 16px 60px;
+  }
+
+  /* ── HEADER ── */
+  .game-header {
+    text-align: center;
+    margin-bottom: 28px;
+  }
+
+  .game-title {
+    font-size: clamp(2rem, 6vw, 3rem);
+    font-weight: 900;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    margin-bottom: 6px;
+  }
+
+  .game-title .emoji { font-size: 1.1em; }
+  .game-title .highlight { color: var(--accent); }
+
+  .game-subtitle {
+    font-size: 0.85rem;
+    color: var(--muted);
+    font-weight: 600;
+    letter-spacing: 0.05em;
+  }
+
+  /* ── DIFFICULTY TABS ── */
+  .diff-tabs {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    margin-bottom: 24px;
+  }
+
+  .diff-tab {
+    font-family: 'Fira Code', monospace;
+    font-size: 0.68rem;
+    letter-spacing: 0.08em;
+    padding: 8px 20px;
+    border-radius: 8px;
+    border: 1.5px solid var(--border);
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .diff-tab:hover { border-color: var(--accent); color: var(--accent); }
+  .diff-tab.active { background: var(--accent); color: white; border-color: var(--accent); }
+  .diff-tab.active.medium { background: var(--accent2); border-color: var(--accent2); }
+  .diff-tab.active.hard { background: var(--green); border-color: var(--green); color: #111; }
+
+  /* ── STATS BAR ── */
+  .stats-bar {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 24px;
+  }
+
+  .stat-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px 8px;
+    text-align: center;
+  }
+
+  .stat-val {
+    font-family: 'Fira Code', monospace;
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: var(--text);
+    line-height: 1;
+  }
+
+  .stat-val.accent { color: var(--accent); }
+  .stat-val.green  { color: var(--green); }
+  .stat-val.gold   { color: var(--accent2); }
+
+  .stat-lbl {
+    font-size: 0.62rem;
+    color: var(--muted);
+    margin-top: 4px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  /* ── BOARD ── */
+  .board {
+    display: grid;
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+
+  .board.easy   { grid-template-columns: repeat(4, 1fr); }
+  .board.medium { grid-template-columns: repeat(4, 1fr); }
+  .board.hard   { grid-template-columns: repeat(6, 1fr); }
+
+  /* ── CARD ── */
+  .card-wrap {
+    aspect-ratio: 1;
+    perspective: 800px;
+    cursor: pointer;
+  }
+
+  .card-inner {
+    width: 100%; height: 100%;
+    position: relative;
+    transform-style: preserve-3d;
+    transition: transform 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+    border-radius: 14px;
+  }
+
+  .card-wrap.flipped .card-inner  { transform: rotateY(180deg); }
+  .card-wrap.matched .card-inner  { transform: rotateY(180deg); }
+  .card-wrap.matched .card-front  {
+    background: linear-gradient(135deg, #1a3d2b, #0d2b1e);
+    border-color: var(--green);
+    box-shadow: 0 0 20px rgba(78,204,163,0.3);
+  }
+
+  .card-wrap.wrong .card-inner {
+    animation: shake 0.4s ease;
+  }
+
+  .card-back,
+  .card-front {
+    position: absolute;
+    inset: 0;
+    border-radius: 14px;
+    backface-visibility: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid;
+    transition: border-color 0.3s, box-shadow 0.3s;
+  }
+
+  .card-back {
+    background: var(--card-back);
+    border-color: var(--border);
+    font-size: clamp(1.4rem, 4vw, 2rem);
+    color: rgba(255,255,255,0.15);
+    font-weight: 900;
+  }
+
+  .card-back::after {
+    content: '?';
+    font-family: 'Nunito', sans-serif;
+    font-size: clamp(1.2rem, 3.5vw, 1.8rem);
+    font-weight: 900;
+    color: rgba(255,255,255,0.2);
+  }
+
+  .card-front {
+    background: white;
+    border-color: rgba(255,255,255,0.2);
+    transform: rotateY(180deg);
+    font-size: clamp(1.6rem, 5vw, 2.4rem);
+  }
+
+  .card-wrap:hover:not(.flipped):not(.matched) .card-back {
+    border-color: var(--accent);
+    box-shadow: 0 0 16px rgba(233,69,96,0.3);
+    background: #133060;
+  }
+
+  /* ── ACTIONS ── */
+  .actions {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+  }
+
+  .btn-game {
+    font-family: 'Nunito', sans-serif;
+    font-weight: 800;
+    font-size: 0.85rem;
+    letter-spacing: 0.05em;
+    padding: 12px 28px;
+    border-radius: 10px;
+    border: none;
+    cursor: pointer;
+    transition: transform 0.15s, box-shadow 0.15s, opacity 0.15s;
+  }
+
+  .btn-game:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,0.35); }
+  .btn-game:active { transform: translateY(0); }
+
+  .btn-restart {
+    background: var(--accent);
+    color: white;
+  }
+
+  .btn-hint {
+    background: var(--surface);
+    color: var(--text);
+    border: 1.5px solid var(--border);
+  }
+  .btn-hint:disabled { opacity: 0.3; cursor: not-allowed; transform: none !important; }
+
+  /* ── WIN OVERLAY ── */
+  .win-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    background: rgba(10,10,20,0.85);
+    backdrop-filter: blur(8px);
+    align-items: center;
+    justify-content: center;
+  }
+
+  .win-overlay.show { display: flex; }
+
+  .win-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 24px;
+    padding: 48px 40px;
+    text-align: center;
+    max-width: 380px;
+    width: 90%;
+    animation: popIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    box-shadow: 0 32px 80px rgba(0,0,0,0.6);
+  }
+
+  .win-emoji { font-size: 4rem; display: block; margin-bottom: 12px; animation: bounce 0.6s 0.3s ease both; }
+
+  .win-title {
+    font-size: 2rem;
+    font-weight: 900;
+    color: var(--green);
+    margin-bottom: 8px;
+  }
+
+  .win-sub { color: var(--muted); font-size: 0.9rem; margin-bottom: 28px; }
+
+  .win-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 28px;
+  }
+
+  .win-stat {
+    background: var(--bg);
+    border-radius: 12px;
+    padding: 14px 8px;
+    border: 1px solid var(--border);
+  }
+
+  .win-stat-n { font-family: 'Fira Code', monospace; font-size: 1.5rem; font-weight: 700; color: var(--text); }
+  .win-stat-l { font-size: 0.62rem; color: var(--muted); margin-top: 3px; letter-spacing: 0.08em; }
+
+  .btn-play-again {
+    width: 100%;
+    background: var(--accent);
+    color: white;
+    font-family: 'Nunito', sans-serif;
+    font-size: 1rem;
+    font-weight: 800;
+    padding: 14px;
+    border-radius: 12px;
+    border: none;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.15s;
+  }
+  .btn-play-again:hover { background: #c73350; transform: translateY(-2px); }
+
+  /* BEST SCORE BANNER */
+  .best-banner {
+    display: none;
+    background: linear-gradient(90deg, rgba(245,166,35,0.15), rgba(245,166,35,0.05));
+    border: 1px solid rgba(245,166,35,0.3);
+    border-radius: 10px;
+    padding: 10px 16px;
+    text-align: center;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--accent2);
+    margin-bottom: 16px;
+  }
+  .best-banner.show { display: block; }
+
+  /* CONFETTI */
+  .confetti-piece {
+    position: fixed;
+    width: 10px; height: 10px;
+    border-radius: 2px;
+    pointer-events: none;
+    z-index: 300;
+    animation: confettiFall linear forwards;
+  }
+
+  /* ── ANIMATIONS ── */
+  @keyframes shake {
+    0%, 100% { transform: rotateY(180deg) translateX(0); }
+    25% { transform: rotateY(180deg) translateX(-6px); }
+    75% { transform: rotateY(180deg) translateX(6px); }
+  }
+
+  @keyframes popIn {
+    from { transform: scale(0.7); opacity: 0; }
+    to   { transform: scale(1); opacity: 1; }
+  }
+
+  @keyframes bounce {
+    0%   { transform: scale(0); }
+    60%  { transform: scale(1.3); }
+    100% { transform: scale(1); }
+  }
+
+  @keyframes confettiFall {
+    0%   { transform: translateY(-20px) rotate(0deg); opacity: 1; }
+    100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+  }
+
+  @keyframes matchPulse {
+    0%   { transform: rotateY(180deg) scale(1); }
+    50%  { transform: rotateY(180deg) scale(1.12); }
+    100% { transform: rotateY(180deg) scale(1); }
+  }
+
+  .card-wrap.matched .card-inner {
+    animation: matchPulse 0.35s ease;
+  }
+
+  /* ── RESPONSIVE ── */
+  @media (max-width: 480px) {
+    .board.hard { grid-template-columns: repeat(4, 1fr); }
+    .stats-bar  { grid-template-columns: 1fr 1fr; }
+    .win-stats  { grid-template-columns: 1fr 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="game-wrapper">
+
+  <!-- HEADER -->
+  <div class="game-header">
+    <h1 class="game-title">
+      <span class="emoji">🧠</span>
+      Emoji <span class="highlight">Memory</span> Match
+    </h1>
+    <p class="game-subtitle">Find all matching pairs to win!</p>
+  </div>
+
+  <!-- BEST SCORE BANNER -->
+  <div class="best-banner" id="bestBanner">🏆 New Best Score!</div>
+
+  <!-- DIFFICULTY TABS -->
+  <div class="diff-tabs">
+    <button class="diff-tab active" data-diff="easy">Easy · 4×4</button>
+    <button class="diff-tab medium" data-diff="medium">Medium · 4×5</button>
+    <button class="diff-tab hard" data-diff="hard">Hard · 6×6</button>
+  </div>
+
+  <!-- STATS BAR -->
+  <div class="stats-bar">
+    <div class="stat-box">
+      <div class="stat-val accent" id="movesVal">0</div>
+      <div class="stat-lbl">Moves</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-val green" id="matchesVal">0</div>
+      <div class="stat-lbl">Matches</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-val" id="timerVal">0:00</div>
+      <div class="stat-lbl">Time</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-val gold" id="bestVal">—</div>
+      <div class="stat-lbl">Best</div>
+    </div>
+  </div>
+
+  <!-- BOARD -->
+  <div class="board easy" id="board"></div>
+
+  <!-- ACTIONS -->
+  <div class="actions">
+    <button class="btn-game btn-restart" id="btnRestart">🔄 New Game</button>
+    <button class="btn-game btn-hint" id="btnHint">💡 Hint (3)</button>
+  </div>
+
+</div>
+
+<!-- WIN OVERLAY -->
+<div class="win-overlay" id="winOverlay">
+  <div class="win-card">
+    <span class="win-emoji" id="winEmoji">🎉</span>
+    <div class="win-title">You Win!</div>
+    <div class="win-sub" id="winSub">Amazing memory! Here's your score:</div>
+    <div class="win-stats">
+      <div class="win-stat">
+        <div class="win-stat-n" id="wMoves">—</div>
+        <div class="win-stat-l">Moves</div>
+      </div>
+      <div class="win-stat">
+        <div class="win-stat-n" id="wTime">—</div>
+        <div class="win-stat-l">Time</div>
+      </div>
+      <div class="win-stat">
+        <div class="win-stat-n" id="wScore">—</div>
+        <div class="win-stat-l">Score</div>
+      </div>
+    </div>
+    <button class="btn-play-again" id="btnPlayAgain">🎮 Play Again</button>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/js/bootstrap.bundle.min.js"></script>
+<script>
+// ── EMOJI SETS
+const EMOJI_POOL = [
+  '🐶','🐱','🦊','🐻','🐼','🐨','🐯','🦁',
+  '🦋','🐸','🦄','🐙','🦀','🦓','🦒','🐘',
+  '🍕','🍔','🍟','🌮','🍜','🍣','🎂','🧁',
+  '🚀','🛸','🌈','⚡','🔥','🌊','🌸','🎯',
+  '💎','🎸','🎺','🎻','🥁','🎹','🎮','🕹️',
+  '🏆','⚽','🏀','🎾','🏓','🥊','🎳','🏄',
+];
+
+// ── DIFFICULTY CONFIG
+const DIFF = {
+  easy:   { pairs: 8,  grid: 'easy',   cols: 4 },
+  medium: { pairs: 10, grid: 'medium',  cols: 4 },
+  hard:   { pairs: 18, grid: 'hard',   cols: 6 },
+};
+
+// ── STATE
+let difficulty   = 'easy';
+let cards        = [];
+let flipped      = [];
+let matched      = 0;
+let moves        = 0;
+let hintsLeft    = 3;
+let timerInterval = null;
+let seconds      = 0;
+let locked       = false;
+let gameStarted  = false;
+let bestScores   = JSON.parse(localStorage.getItem('memoryBest') || '{}');
+
+// ── DOM
+const board      = document.getElementById('board');
+const movesEl    = document.getElementById('movesVal');
+const matchesEl  = document.getElementById('matchesVal');
+const timerEl    = document.getElementById('timerVal');
+const bestEl     = document.getElementById('bestVal');
+const btnRestart = document.getElementById('btnRestart');
+const btnHint    = document.getElementById('btnHint');
+const winOverlay = document.getElementById('winOverlay');
+const bestBanner = document.getElementById('bestBanner');
+
+// ── HELPERS
+function shuffle(arr) {
+  return [...arr].sort(() => Math.random() - 0.5);
+}
+
+function fmt(s) {
+  const m = Math.floor(s / 60);
+  return `${m}:${String(s % 60).padStart(2,'0')}`;
+}
+
+function calcScore(moves, seconds, pairs) {
+  const base = pairs * 100;
+  const movePenalty = Math.max(0, (moves - pairs) * 5);
+  const timePenalty = Math.floor(seconds / 2);
+  return Math.max(0, base - movePenalty - timePenalty);
+}
+
+// ── INIT GAME
+function initGame() {
+  clearInterval(timerInterval);
+  seconds    = 0;
+  moves      = 0;
+  matched    = 0;
+  hintsLeft  = 3;
+  flipped    = [];
+  locked     = false;
+  gameStarted = false;
+
+  movesEl.textContent   = '0';
+  matchesEl.textContent = '0';
+  timerEl.textContent   = '0:00';
+  bestBanner.classList.remove('show');
+  winOverlay.classList.remove('show');
+
+  const cfg = DIFF[difficulty];
+  board.className = `board ${cfg.grid}`;
+
+  // Update best display
+  const b = bestScores[difficulty];
+  bestEl.textContent = b ? b.score : '—';
+
+  // Update hint button
+  btnHint.textContent = `💡 Hint (${hintsLeft})`;
+  btnHint.disabled = false;
+
+  // Build card pairs
+  const chosen = shuffle(EMOJI_POOL).slice(0, cfg.pairs);
+  cards = shuffle([...chosen, ...chosen]);
+
+  // Render
+  board.innerHTML = '';
+  cards.forEach((emoji, i) => {
+    const wrap = document.createElement('div');
+    wrap.className = 'card-wrap';
+    wrap.dataset.index = i;
+    wrap.dataset.emoji = emoji;
+    wrap.innerHTML = `
+      <div class="card-inner">
+        <div class="card-back"></div>
+        <div class="card-front">${emoji}</div>
+      </div>
+    `;
+    wrap.addEventListener('click', () => onCardClick(wrap));
+    board.appendChild(wrap);
+  });
+
+  // Brief peek on start
+  doPeek();
+}
+
+// ── PEEK (show all for 0.8s at start)
+function doPeek() {
+  const all = board.querySelectorAll('.card-wrap');
+  all.forEach(c => c.classList.add('flipped'));
+  setTimeout(() => {
+    all.forEach(c => c.classList.remove('flipped'));
+  }, 900);
+}
+
+// ── CARD CLICK
+function onCardClick(wrap) {
+  if (locked) return;
+  if (wrap.classList.contains('flipped')) return;
+  if (wrap.classList.contains('matched')) return;
+
+  // Start timer on first click
+  if (!gameStarted) {
+    gameStarted = true;
+    timerInterval = setInterval(() => {
+      seconds++;
+      timerEl.textContent = fmt(seconds);
+    }, 1000);
+  }
+
+  wrap.classList.add('flipped');
+  flipped.push(wrap);
+
+  if (flipped.length === 2) {
+    locked = true;
+    moves++;
+    movesEl.textContent = moves;
+    checkMatch();
+  }
+}
+
+// ── CHECK MATCH
+function checkMatch() {
+  const [a, b] = flipped;
+  if (a.dataset.emoji === b.dataset.emoji) {
+    // MATCH ✅
+    setTimeout(() => {
+      a.classList.add('matched');
+      b.classList.add('matched');
+      flipped = [];
+      locked  = false;
+      matched++;
+      matchesEl.textContent = matched;
+
+      const cfg = DIFF[difficulty];
+      if (matched === cfg.pairs) onWin();
+    }, 300);
+  } else {
+    // NO MATCH ❌
+    a.classList.add('wrong');
+    b.classList.add('wrong');
+    setTimeout(() => {
+      a.classList.remove('flipped', 'wrong');
+      b.classList.remove('flipped', 'wrong');
+      flipped = [];
+      locked  = false;
+    }, 800);
+  }
+}
+
+// ── WIN
+function onWin() {
+  clearInterval(timerInterval);
+  const cfg   = DIFF[difficulty];
+  const score = calcScore(moves, seconds, cfg.pairs);
+
+  // Check best
+  const prev = bestScores[difficulty];
+  const isNew = !prev || score > prev.score;
+
+  if (isNew) {
+    bestScores[difficulty] = { score, moves, time: fmt(seconds) };
+    localStorage.setItem('memoryBest', JSON.stringify(bestScores));
+    bestEl.textContent = score;
+    bestBanner.classList.add('show');
+  }
+
+  // Win emojis based on performance
+  const winEmojis = score > 700 ? '🏆' : score > 400 ? '🎉' : '😊';
+  document.getElementById('winEmoji').textContent = winEmojis;
+  document.getElementById('wMoves').textContent   = moves;
+  document.getElementById('wTime').textContent    = fmt(seconds);
+  document.getElementById('wScore').textContent   = score;
+  document.getElementById('winSub').textContent   = isNew
+    ? '🌟 New personal best!'
+    : score > 700 ? 'Incredible performance!' : 'Well played!';
+
+  setTimeout(() => {
+    winOverlay.classList.add('show');
+    spawnConfetti();
+  }, 400);
+}
+
+// ── HINT
+function doHint() {
+  if (hintsLeft <= 0 || locked) return;
+
+  // Find first unmatched pair
+  const unmatched = [...board.querySelectorAll('.card-wrap:not(.matched):not(.flipped)')];
+  if (unmatched.length < 2) return;
+
+  // Group by emoji
+  const groups = {};
+  unmatched.forEach(c => {
+    const e = c.dataset.emoji;
+    if (!groups[e]) groups[e] = [];
+    groups[e].push(c);
+  });
+
+  const pair = Object.values(groups).find(g => g.length >= 2);
+  if (!pair) return;
+
+  hintsLeft--;
+  btnHint.textContent = `💡 Hint (${hintsLeft})`;
+  if (hintsLeft === 0) btnHint.disabled = true;
+
+  locked = true;
+  pair[0].classList.add('flipped');
+  pair[1].classList.add('flipped');
+  setTimeout(() => {
+    pair[0].classList.remove('flipped');
+    pair[1].classList.remove('flipped');
+    locked = false;
+  }, 1000);
+}
+
+// ── CONFETTI
+function spawnConfetti() {
+  const colors = ['#e94560','#f5a623','#4ecca3','#a78bfa','#60a5fa','#f472b6'];
+  for (let i = 0; i < 80; i++) {
+    const el = document.createElement('div');
+    el.className = 'confetti-piece';
+    el.style.cssText = `
+      left: ${Math.random() * 100}vw;
+      top: -10px;
+      background: ${colors[Math.floor(Math.random() * colors.length)]};
+      width: ${6 + Math.random() * 8}px;
+      height: ${6 + Math.random() * 8}px;
+      border-radius: ${Math.random() > 0.5 ? '50%' : '2px'};
+      animation-duration: ${1.5 + Math.random() * 2}s;
+      animation-delay: ${Math.random() * 0.8}s;
+    `;
+    document.body.appendChild(el);
+    el.addEventListener('animationend', () => el.remove());
+  }
+}
+
+// ── EVENT LISTENERS
+btnRestart.addEventListener('click', initGame);
+btnHint.addEventListener('click', doHint);
+
+document.getElementById('btnPlayAgain').addEventListener('click', () => {
+  winOverlay.classList.remove('show');
+  initGame();
+});
+
+document.querySelectorAll('.diff-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.diff-tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    difficulty = tab.dataset.diff;
+    initGame();
+  });
+});
+
+// ── START
+initGame();
+</script>
+</body>
+</html>
